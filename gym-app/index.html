@@ -238,10 +238,76 @@
             return today.toISOString().split('T')[0];
         }
 
+        // Default exercises
+        const DEFAULT_EXERCISES = [
+            'Bench Press',
+            'Machine Fly',
+            'Cable Rope Tricep Extension',
+            'Lat Pulldown',
+            'Seated Cable Row',
+            'Shoulder Press',
+            'Bicep Curl',
+            'Squat',
+            'Lunges'
+        ];
+
         // Load exercises from localStorage
         function loadExercises() {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            return stored ? JSON.parse(stored) : [];
+            try {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                if (!stored) {
+                    // No data - create default exercises
+                    return initializeDefaultExercises();
+                }
+
+                const exercises = JSON.parse(stored);
+
+                // Validate format - check if exercises have the new structure
+                if (exercises.length > 0) {
+                    const firstSet = exercises[0]?.sets?.[0];
+                    if (!firstSet || !firstSet.current || !firstSet.previous || !firstSet.best) {
+                        // Invalid format - reinitialize with defaults
+                        return initializeDefaultExercises();
+                    }
+                }
+
+                return exercises;
+            } catch (e) {
+                // Parse error - reinitialize with defaults
+                return initializeDefaultExercises();
+            }
+        }
+
+        // Initialize default exercises
+        function initializeDefaultExercises() {
+            const exercises = DEFAULT_EXERCISES.map((name, index) => {
+                return {
+                    id: Date.now() + index,
+                    name: name,
+                    sets: [
+                        {
+                            setNumber: 1,
+                            current: { weight: '', reps: '' },
+                            previous: { weight: '', reps: '' },
+                            best: { weight: '', reps: '' }
+                        },
+                        {
+                            setNumber: 2,
+                            current: { weight: '', reps: '' },
+                            previous: { weight: '', reps: '' },
+                            best: { weight: '', reps: '' }
+                        },
+                        {
+                            setNumber: 3,
+                            current: { weight: '', reps: '' },
+                            previous: { weight: '', reps: '' },
+                            best: { weight: '', reps: '' }
+                        }
+                    ]
+                };
+            });
+            saveExercises(exercises);
+            return exercises;
         }
 
         // Save exercises to localStorage
@@ -259,34 +325,6 @@
             localStorage.setItem(LAST_UPDATE_KEY, date);
         }
 
-        // Migrate old data format to new format
-        function migrateOldData() {
-            const exercises = loadExercises();
-            let needsSave = false;
-
-            exercises.forEach(exercise => {
-                exercise.sets.forEach(set => {
-                    // Check if this is old format (has completed, targetReps fields)
-                    if (!set.current && !set.previous && !set.best) {
-                        // Migrate to new format
-                        set.current = { weight: '', reps: '' };
-                        set.previous = { weight: '', reps: '' };
-                        set.best = { weight: '', reps: '' };
-
-                        // Clean up old fields
-                        delete set.completed;
-                        delete set.targetReps;
-
-                        needsSave = true;
-                    }
-                });
-            });
-
-            if (needsSave) {
-                saveExercises(exercises);
-            }
-        }
-
         // Check if we need to rollover to a new day
         function checkAndRolloverDay() {
             const today = getTodayString();
@@ -297,11 +335,6 @@
                 const exercises = loadExercises();
                 exercises.forEach(exercise => {
                     exercise.sets.forEach(set => {
-                        // Ensure set has the new format
-                        if (!set.current) set.current = { weight: '', reps: '' };
-                        if (!set.previous) set.previous = { weight: '', reps: '' };
-                        if (!set.best) set.best = { weight: '', reps: '' };
-
                         // Move current to previous
                         set.previous = {
                             weight: set.current.weight,
@@ -465,9 +498,6 @@
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', () => {
-            // Migrate old data format if needed
-            migrateOldData();
-
             // Check and rollover day if needed
             checkAndRolloverDay();
 
