@@ -23,7 +23,7 @@
             border-radius: 8px;
             padding: 8px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 600px;
+            max-width: 800px;
             margin: 0 auto;
         }
 
@@ -80,44 +80,70 @@
         }
 
         .set-row {
-            display: flex;
+            display: grid;
+            grid-template-columns: 40px 1fr 1fr 1fr;
+            gap: 4px;
             align-items: center;
-            justify-content: space-between;
             background: white;
-            padding: 6px 8px;
+            padding: 4px;
             border-radius: 4px;
             border: 1px solid #e0e0e0;
-        }
-
-        .set-row.completed {
-            border-color: #667eea;
-            background: #f0f4ff;
-        }
-
-        .set-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex: 1;
         }
 
         .set-number {
             font-weight: 600;
             color: #667eea;
-            min-width: 35px;
-            font-size: 0.9em;
+            font-size: 0.85em;
         }
 
-        .set-target {
+        .set-data {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .set-data-label {
+            font-size: 0.7em;
+            color: #999;
+            font-weight: 600;
+        }
+
+        .set-data-inputs {
+            display: flex;
+            gap: 2px;
+            align-items: center;
+        }
+
+        .set-input {
+            width: 45px;
+            padding: 4px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 0.85em;
+            text-align: center;
+        }
+
+        .set-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .set-input-label {
+            font-size: 0.75em;
             color: #666;
-            font-size: 0.9em;
+            width: 25px;
         }
 
-        .checkbox {
-            width: 22px;
-            height: 22px;
-            cursor: pointer;
-            accent-color: #667eea;
+        .current {
+            background: #f0f4ff;
+        }
+
+        .previous {
+            background: #fff9e6;
+        }
+
+        .best {
+            background: #e6ffe6;
         }
 
         .add-exercise-form {
@@ -204,6 +230,13 @@
 
     <script>
         const STORAGE_KEY = 'gymAppExercises';
+        const LAST_UPDATE_KEY = 'gymAppLastUpdate';
+
+        // Get today's date string (YYYY-MM-DD)
+        function getTodayString() {
+            const today = new Date();
+            return today.toISOString().split('T')[0];
+        }
 
         // Load exercises from localStorage
         function loadExercises() {
@@ -216,17 +249,94 @@
             localStorage.setItem(STORAGE_KEY, JSON.stringify(exercises));
         }
 
+        // Get last update date
+        function getLastUpdateDate() {
+            return localStorage.getItem(LAST_UPDATE_KEY);
+        }
+
+        // Set last update date
+        function setLastUpdateDate(date) {
+            localStorage.setItem(LAST_UPDATE_KEY, date);
+        }
+
+        // Check if we need to rollover to a new day
+        function checkAndRolloverDay() {
+            const today = getTodayString();
+            const lastUpdate = getLastUpdateDate();
+
+            if (lastUpdate !== today) {
+                // New day detected - rollover all exercises
+                const exercises = loadExercises();
+                exercises.forEach(exercise => {
+                    exercise.sets.forEach(set => {
+                        // Move current to previous
+                        set.previous = {
+                            weight: set.current.weight,
+                            reps: set.current.reps
+                        };
+
+                        // Update best if current is better
+                        // Better = more weight with same or more reps
+                        const currentWeight = parseFloat(set.current.weight) || 0;
+                        const currentReps = parseInt(set.current.reps) || 0;
+                        const bestWeight = parseFloat(set.best.weight) || 0;
+                        const bestReps = parseInt(set.best.reps) || 0;
+
+                        if (currentWeight > bestWeight ||
+                            (currentWeight === bestWeight && currentReps > bestReps)) {
+                            set.best = {
+                                weight: set.current.weight,
+                                reps: set.current.reps
+                            };
+                        }
+
+                        // Reset current to empty
+                        set.current = { weight: '', reps: '' };
+                    });
+                });
+
+                saveExercises(exercises);
+                setLastUpdateDate(today);
+            }
+        }
+
         // Create a new exercise object
         function createExercise(name) {
             return {
                 id: Date.now(),
                 name: name,
                 sets: [
-                    { setNumber: 1, targetReps: 12, completed: false },
-                    { setNumber: 2, targetReps: 12, completed: false },
-                    { setNumber: 3, targetReps: 12, completed: false }
+                    {
+                        setNumber: 1,
+                        current: { weight: '', reps: '' },
+                        previous: { weight: '', reps: '' },
+                        best: { weight: '', reps: '' }
+                    },
+                    {
+                        setNumber: 2,
+                        current: { weight: '', reps: '' },
+                        previous: { weight: '', reps: '' },
+                        best: { weight: '', reps: '' }
+                    },
+                    {
+                        setNumber: 3,
+                        current: { weight: '', reps: '' },
+                        previous: { weight: '', reps: '' },
+                        best: { weight: '', reps: '' }
+                    }
                 ]
             };
+        }
+
+        // Update a set value
+        function updateSet(exerciseId, setIndex, category, field, value) {
+            const exercises = loadExercises();
+            const exercise = exercises.find(ex => ex.id === exerciseId);
+
+            if (exercise) {
+                exercise.sets[setIndex][category][field] = value;
+                saveExercises(exercises);
+            }
         }
 
         // Render all exercises
@@ -252,17 +362,32 @@
                     </div>
                     <div class="sets-container">
                         ${exercise.sets.map((set, index) => `
-                            <div class="set-row ${set.completed ? 'completed' : ''}">
-                                <div class="set-info">
-                                    <span class="set-number">Set ${set.setNumber}</span>
-                                    <span class="set-target">${set.targetReps} reps</span>
-                                </div>
-                                <input
-                                    type="checkbox"
-                                    class="checkbox"
-                                    ${set.completed ? 'checked' : ''}
-                                    onchange="toggleSet(${exercise.id}, ${index})"
-                                >
+                            <div class="set-row">
+                                <div class="set-number">Set ${set.setNumber}</div>
+                                ${['current', 'previous', 'best'].map(category => `
+                                    <div class="set-data ${category}">
+                                        <div class="set-data-label">${category.toUpperCase()}</div>
+                                        <div class="set-data-inputs">
+                                            <input
+                                                type="number"
+                                                class="set-input"
+                                                placeholder="kg"
+                                                value="${set[category].weight}"
+                                                oninput="updateSet(${exercise.id}, ${index}, '${category}', 'weight', this.value)"
+                                                step="0.5"
+                                            >
+                                            <span class="set-input-label">kg</span>
+                                            <input
+                                                type="number"
+                                                class="set-input"
+                                                placeholder="reps"
+                                                value="${set[category].reps}"
+                                                oninput="updateSet(${exercise.id}, ${index}, '${category}', 'reps', this.value)"
+                                            >
+                                            <span class="set-input-label">reps</span>
+                                        </div>
+                                    </div>
+                                `).join('')}
                             </div>
                         `).join('')}
                     </div>
@@ -298,18 +423,6 @@
             renderExercises();
         }
 
-        // Toggle set completion
-        function toggleSet(exerciseId, setIndex) {
-            const exercises = loadExercises();
-            const exercise = exercises.find(ex => ex.id === exerciseId);
-
-            if (exercise) {
-                exercise.sets[setIndex].completed = !exercise.sets[setIndex].completed;
-                saveExercises(exercises);
-                renderExercises();
-            }
-        }
-
         // Escape HTML to prevent XSS
         function escapeHtml(text) {
             const div = document.createElement('div');
@@ -317,8 +430,12 @@
             return div.innerHTML;
         }
 
-        // Allow Enter key to add exercise
+        // Initialize app
         document.addEventListener('DOMContentLoaded', () => {
+            // Check and rollover day if needed
+            checkAndRolloverDay();
+
+            // Allow Enter key to add exercise
             document.getElementById('exerciseInput').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     addExercise();
