@@ -50,12 +50,31 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 4px;
+            cursor: pointer;
+            user-select: none;
         }
 
         .exercise-name {
             font-size: 0.95em;
             font-weight: 600;
             color: #333;
+            flex: 1;
+        }
+
+        .collapse-indicator {
+            font-size: 0.75em;
+            color: #999;
+            padding: 0 6px;
+            transition: transform 0.2s;
+            display: inline-block;
+        }
+
+        .exercise-card.collapsed .collapse-indicator {
+            transform: rotate(-90deg);
+        }
+
+        .exercise-card.collapsed .sets-container {
+            display: none;
         }
 
         .delete-btn {
@@ -241,10 +260,15 @@
         // Default exercises
         const DEFAULT_EXERCISES = [
             'Bench Press',
+            'Dumbell Bench Press',
             'Machine Fly',
+            'Dumbell Chest Fly',
             'Cable Rope Tricep Extension',
+            'Skullcrushers',
             'Lat Pulldown',
+            'Dumbell Pullover',
             'Seated Cable Row',
+            'Rows',
             'Shoulder Press',
             'Bicep Curl',
             'Squat',
@@ -271,6 +295,20 @@
                     }
                 }
 
+                // Ensure collapsed property exists on all exercises
+                exercises.forEach(ex => {
+                    if (ex.collapsed === undefined) ex.collapsed = false;
+                });
+
+                // Add any missing default exercises
+                const existingNames = new Set(exercises.map(ex => ex.name));
+                DEFAULT_EXERCISES.forEach((name, index) => {
+                    if (!existingNames.has(name)) {
+                        exercises.push(createExercise(name));
+                    }
+                });
+
+                saveExercises(exercises);
                 return exercises;
             } catch (e) {
                 // Parse error - reinitialize with defaults
@@ -284,6 +322,7 @@
                 return {
                     id: Date.now() + index,
                     name: name,
+                    collapsed: false,
                     sets: [
                         {
                             setNumber: 1,
@@ -356,8 +395,8 @@
                             };
                         }
 
-                        // Reset current to empty
-                        set.current = { weight: '', reps: '' };
+                        // Pre-fill current with previous day's weight, leave reps empty
+                        set.current = { weight: set.previous.weight, reps: '' };
                     });
                 });
 
@@ -371,6 +410,7 @@
             return {
                 id: Date.now(),
                 name: name,
+                collapsed: false,
                 sets: [
                     {
                         setNumber: 1,
@@ -392,6 +432,17 @@
                     }
                 ]
             };
+        }
+
+        // Toggle collapse state of an exercise
+        function toggleCollapse(id) {
+            const exercises = loadExercises();
+            const exercise = exercises.find(ex => ex.id === id);
+            if (exercise) {
+                exercise.collapsed = !exercise.collapsed;
+                saveExercises(exercises);
+                renderExercises();
+            }
         }
 
         // Update a set value
@@ -421,10 +472,11 @@
             }
 
             container.innerHTML = exercises.map(exercise => `
-                <div class="exercise-card">
-                    <div class="exercise-header">
+                <div class="exercise-card ${exercise.collapsed ? 'collapsed' : ''}">
+                    <div class="exercise-header" onclick="toggleCollapse(${exercise.id})">
                         <div class="exercise-name">${escapeHtml(exercise.name)}</div>
-                        <button class="delete-btn" onclick="deleteExercise(${exercise.id})">Delete</button>
+                        <span class="collapse-indicator">▼</span>
+                        <button class="delete-btn" onclick="event.stopPropagation(); deleteExercise(${exercise.id})">Delete</button>
                     </div>
                     <div class="sets-container">
                         ${exercise.sets.map((set, index) => `
