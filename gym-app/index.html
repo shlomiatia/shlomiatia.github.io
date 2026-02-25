@@ -34,11 +34,7 @@
             font-size: 1.3em;
         }
 
-        .exercises-list {
-            margin-bottom: 8px;
-        }
-
-        .exercise-card {
+.exercise-card {
             background: #f8f9fa;
             border-radius: 6px;
             padding: 6px;
@@ -165,55 +161,6 @@
             background: #e6ffe6;
         }
 
-        .add-exercise-form {
-            background: #f0f4ff;
-            border-radius: 6px;
-            padding: 8px;
-            margin-top: 8px;
-        }
-
-        .form-title {
-            font-size: 0.9em;
-            font-weight: 600;
-            color: #667eea;
-            margin-bottom: 6px;
-        }
-
-        .form-group {
-            display: flex;
-            gap: 6px;
-        }
-
-        .exercise-input {
-            flex: 1;
-            padding: 8px;
-            border: 2px solid #667eea;
-            border-radius: 4px;
-            font-size: 0.9em;
-            outline: none;
-        }
-
-        .exercise-input:focus {
-            border-color: #764ba2;
-        }
-
-        .add-btn {
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 8px 16px;
-            font-size: 0.9em;
-            font-weight: 600;
-            cursor: pointer;
-            touch-action: manipulation;
-            white-space: nowrap;
-        }
-
-        .add-btn:active {
-            background: #764ba2;
-        }
-
         .empty-state {
             text-align: center;
             padding: 20px 10px;
@@ -231,20 +178,6 @@
         <h1>💪 Gym Tracker</h1>
 
         <div id="exercisesList" class="exercises-list"></div>
-
-        <div class="add-exercise-form">
-            <div class="form-title">Add New Exercise</div>
-            <div class="form-group">
-                <input
-                    type="text"
-                    id="exerciseInput"
-                    class="exercise-input"
-                    placeholder="Exercise name (e.g., Bench Press)"
-                    autocomplete="off"
-                >
-                <button onclick="addExercise()" class="add-btn">Add</button>
-            </div>
-        </div>
     </div>
 
     <script>
@@ -302,10 +235,18 @@
 
                 // Add any missing default exercises
                 const existingNames = new Set(exercises.map(ex => ex.name));
-                DEFAULT_EXERCISES.forEach((name, index) => {
+                DEFAULT_EXERCISES.forEach(name => {
                     if (!existingNames.has(name)) {
                         exercises.push(createExercise(name));
                     }
+                });
+
+                // Sort by DEFAULT_EXERCISES order; non-defaults go to the end
+                const defaultOrder = new Map(DEFAULT_EXERCISES.map((name, i) => [name, i]));
+                exercises.sort((a, b) => {
+                    const ai = defaultOrder.has(a.name) ? defaultOrder.get(a.name) : Infinity;
+                    const bi = defaultOrder.has(b.name) ? defaultOrder.get(b.name) : Infinity;
+                    return ai - bi;
                 });
 
                 saveExercises(exercises);
@@ -513,24 +454,6 @@
             `).join('');
         }
 
-        // Add new exercise
-        function addExercise() {
-            const input = document.getElementById('exerciseInput');
-            const name = input.value.trim();
-
-            if (!name) {
-                alert('Please enter an exercise name');
-                return;
-            }
-
-            const exercises = loadExercises();
-            exercises.push(createExercise(name));
-            saveExercises(exercises);
-
-            input.value = '';
-            renderExercises();
-        }
-
         // Delete exercise
         function deleteExercise(id) {
             if (!confirm('Delete this exercise?')) return;
@@ -552,13 +475,6 @@
         document.addEventListener('DOMContentLoaded', () => {
             // Check and rollover day if needed
             checkAndRolloverDay();
-
-            // Allow Enter key to add exercise
-            document.getElementById('exerciseInput').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    addExercise();
-                }
-            });
 
             // Initial render
             renderExercises();
