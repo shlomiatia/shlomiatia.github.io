@@ -235,9 +235,12 @@
 
                 // Add any missing default exercises
                 const existingNames = new Set(exercises.map(ex => ex.name));
+                let idOffset = 0;
                 DEFAULT_EXERCISES.forEach(name => {
                     if (!existingNames.has(name)) {
-                        exercises.push(createExercise(name));
+                        const ex = createExercise(name);
+                        ex.id = Date.now() + (idOffset++);
+                        exercises.push(ex);
                     }
                 });
 
@@ -315,28 +318,32 @@
                 const exercises = loadExercises();
                 exercises.forEach(exercise => {
                     exercise.sets.forEach(set => {
-                        // Move current to previous
-                        set.previous = {
-                            weight: set.current.weight,
-                            reps: set.current.reps
-                        };
+                        // Only treat current as real data if reps were actually entered
+                        const hasRealData = set.current.reps !== '';
 
-                        // Update best if current is better
-                        // Better = more weight with same or more reps
-                        const currentWeight = parseFloat(set.current.weight) || 0;
-                        const currentReps = parseInt(set.current.reps) || 0;
-                        const bestWeight = parseFloat(set.best.weight) || 0;
-                        const bestReps = parseInt(set.best.reps) || 0;
-
-                        if (currentWeight > bestWeight ||
-                            (currentWeight === bestWeight && currentReps > bestReps)) {
-                            set.best = {
+                        if (hasRealData) {
+                            // Move current to previous
+                            set.previous = {
                                 weight: set.current.weight,
                                 reps: set.current.reps
                             };
+
+                            // Update best if current is better
+                            const currentWeight = parseFloat(set.current.weight) || 0;
+                            const currentReps = parseInt(set.current.reps) || 0;
+                            const bestWeight = parseFloat(set.best.weight) || 0;
+                            const bestReps = parseInt(set.best.reps) || 0;
+
+                            if (currentWeight > bestWeight ||
+                                (currentWeight === bestWeight && currentReps > bestReps)) {
+                                set.best = {
+                                    weight: set.current.weight,
+                                    reps: set.current.reps
+                                };
+                            }
                         }
 
-                        // Pre-fill current with previous day's weight, leave reps empty
+                        // Pre-fill current with previous weight (preserved or updated), leave reps empty
                         set.current = { weight: set.previous.weight, reps: '' };
                     });
                 });
