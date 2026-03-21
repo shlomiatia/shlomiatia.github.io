@@ -219,19 +219,17 @@
 
                 const exercises = JSON.parse(stored);
 
-                // Validate format - check if exercises have the new structure
+                // Migrate old data to new structure
                 if (exercises.length > 0) {
-                    const firstSet = exercises[0]?.sets?.[0];
-                    if (!firstSet || !firstSet.current || !firstSet.previous || !firstSet.best) {
-                        // Invalid format - reinitialize with defaults
-                        return initializeDefaultExercises();
-                    }
+                    exercises.forEach(ex => {
+                        if (ex.collapsed === undefined) ex.collapsed = false;
+                        ex.sets.forEach(set => {
+                            if (!set.current) set.current = { weight: '', reps: '' };
+                            if (!set.previous) set.previous = { weight: '', reps: '' };
+                            if (!set.best) set.best = { weight: '', reps: '' };
+                        });
+                    });
                 }
-
-                // Ensure collapsed property exists on all exercises
-                exercises.forEach(ex => {
-                    if (ex.collapsed === undefined) ex.collapsed = false;
-                });
 
                 // Add any missing default exercises
                 const existingNames = new Set(exercises.map(ex => ex.name));
