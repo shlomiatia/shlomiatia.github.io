@@ -210,52 +210,15 @@
 
         // Load exercises from localStorage
         function loadExercises() {
-            try {
-                const stored = localStorage.getItem(STORAGE_KEY);
-                if (!stored) {
-                    // No data - create default exercises
-                    return initializeDefaultExercises();
-                }
-
-                const exercises = JSON.parse(stored);
-
-                // Migrate old data to new structure
-                if (exercises.length > 0) {
-                    exercises.forEach(ex => {
-                        if (ex.collapsed === undefined) ex.collapsed = false;
-                        ex.sets.forEach(set => {
-                            if (!set.current) set.current = { weight: '', reps: '' };
-                            if (!set.previous) set.previous = { weight: '', reps: '' };
-                            if (!set.best) set.best = { weight: '', reps: '' };
-                        });
-                    });
-                }
-
-                // Add any missing default exercises
-                const existingNames = new Set(exercises.map(ex => ex.name));
-                let idOffset = 0;
-                DEFAULT_EXERCISES.forEach(name => {
-                    if (!existingNames.has(name)) {
-                        const ex = createExercise(name);
-                        ex.id = Date.now() + (idOffset++);
-                        exercises.push(ex);
-                    }
-                });
-
-                // Sort by DEFAULT_EXERCISES order; non-defaults go to the end
-                const defaultOrder = new Map(DEFAULT_EXERCISES.map((name, i) => [name, i]));
-                exercises.sort((a, b) => {
-                    const ai = defaultOrder.has(a.name) ? defaultOrder.get(a.name) : Infinity;
-                    const bi = defaultOrder.has(b.name) ? defaultOrder.get(b.name) : Infinity;
-                    return ai - bi;
-                });
-
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (!stored) {
+                const exercises = initializeDefaultExercises();
                 saveExercises(exercises);
+                setLastUpdateDate(getTodayString());
                 return exercises;
-            } catch (e) {
-                // Parse error - reinitialize with defaults
-                return initializeDefaultExercises();
             }
+            const exercises = JSON.parse(stored);
+            return exercises;
         }
 
         // Initialize default exercises
@@ -287,7 +250,6 @@
                     ]
                 };
             });
-            saveExercises(exercises);
             return exercises;
         }
 
@@ -310,45 +272,66 @@
         function checkAndRolloverDay() {
             const today = getTodayString();
             const lastUpdate = getLastUpdateDate();
+            const exercises = loadExercises();
+
+            // Add any missing default exercises
+            const existingNames = new Set(exercises.map(ex => ex.name));
+            let idOffset = 0;
+            DEFAULT_EXERCISES.forEach(name => {
+                if (!existingNames.has(name)) {
+                    const ex = createExercise(name);
+                    ex.id = Date.now() + (idOffset++);
+                    exercises.push(ex);
+                }
+            });
+
+            // Sort by DEFAULT_EXERCISES order; non-defaults go to the end
+            const defaultOrder = new Map(DEFAULT_EXERCISES.map((name, i) => [name, i]));
+            exercises.sort((a, b) => {
+                const ai = defaultOrder.has(a.name) ? defaultOrder.get(a.name) : Infinity;
+                const bi = defaultOrder.has(b.name) ? defaultOrder.get(b.name) : Infinity;
+                return ai - bi;
+            });
 
             if (lastUpdate !== today) {
                 // New day detected - rollover all exercises
-                const exercises = loadExercises();
                 exercises.forEach(exercise => {
                     exercise.sets.forEach(set => {
-                        // Only treat current as real data if reps were actually entered
-                        const hasRealData = set.current.reps !== '';
+                        // Keep current weight across day boundaries; reps are reset for today.
+                        const currentWeight = set.current?.weight || '';
+                        const currentReps = set.current?.reps || '';
+                        const hasRealData = currentReps !== '';
 
                         if (hasRealData) {
                             // Move current to previous
                             set.previous = {
-                                weight: set.current.weight,
-                                reps: set.current.reps
+                                weight: currentWeight,
+                                reps: currentReps
                             };
 
                             // Update best if current is better
-                            const currentWeight = parseFloat(set.current.weight) || 0;
-                            const currentReps = parseInt(set.current.reps) || 0;
-                            const bestWeight = parseFloat(set.best.weight) || 0;
-                            const bestReps = parseInt(set.best.reps) || 0;
+                            const parsedCurrentWeight = parseFloat(currentWeight) || 0;
+                            const parsedCurrentReps = parseInt(currentReps) || 0;
+                            const parsedBestWeight = parseFloat(set.best.weight) || 0;
+                            const parsedBestReps = parseInt(set.best.reps) || 0;
 
-                            if (currentWeight > bestWeight ||
-                                (currentWeight === bestWeight && currentReps > bestReps)) {
+                            if (parsedCurrentWeight > parsedBestWeight ||
+                                (parsedCurrentWeight === parsedBestWeight && parsedCurrentReps > parsedBestReps)) {
                                 set.best = {
-                                    weight: set.current.weight,
-                                    reps: set.current.reps
+                                    weight: currentWeight,
+                                    reps: currentReps
                                 };
                             }
                         }
 
-                        // Pre-fill current with previous weight (preserved or updated), leave reps empty
-                        set.current = { weight: set.previous.weight, reps: '' };
+                        set.current = { weight: currentWeight, reps: '' };
                     });
                 });
 
-                saveExercises(exercises);
                 setLastUpdateDate(today);
             }
+
+            saveExercises(exercises);
         }
 
         // Create a new exercise object
