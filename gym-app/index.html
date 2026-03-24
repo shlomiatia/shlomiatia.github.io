@@ -171,6 +171,40 @@
             font-size: 2em;
             margin-bottom: 6px;
         }
+
+        .debug-json {
+            margin-top: 12px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: #f7f7f7;
+        }
+
+        .debug-json h2 {
+            font-size: 0.95em;
+            margin-bottom: 6px;
+            color: #333;
+        }
+
+        .debug-json textarea {
+            width: 100%;
+            min-height: 120px;
+            font-family: monospace;
+            font-size: 0.75em;
+            padding: 6px;
+            margin-top: 4px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            resize: vertical;
+            background: #fff;
+        }
+
+        .debug-json-label {
+            font-size: 0.8em;
+            color: #555;
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body>
@@ -178,6 +212,14 @@
         <h1>💪 Gym Tracker</h1>
 
         <div id="exercisesList" class="exercises-list"></div>
+
+        <div id="debugJson" class="debug-json">
+            <h2>Copyable JSON (debug)</h2>
+            <div class="debug-json-label">Loaded from localStorage:</div>
+            <textarea id="loadedJson" readonly></textarea>
+            <div class="debug-json-label">Just before last save:</div>
+            <textarea id="savedJson" readonly></textarea>
+        </div>
     </div>
 
     <script>
@@ -212,11 +254,15 @@
         function loadExercises() {
             const stored = localStorage.getItem(STORAGE_KEY);
             if (!stored) {
+                lastLoadedJson = 'null';
+                updateDebugJson();
                 const exercises = initializeDefaultExercises();
                 saveExercises(exercises);
                 setLastUpdateDate(getTodayString());
                 return exercises;
             }
+            lastLoadedJson = JSON.stringify(JSON.parse(stored), null, 2);
+            updateDebugJson();
             const exercises = JSON.parse(stored);
             return exercises;
         }
@@ -253,8 +299,20 @@
             return exercises;
         }
 
+        let lastLoadedJson = '';
+        let lastSavedJson = '';
+
+        function updateDebugJson() {
+            const loadedEl = document.getElementById('loadedJson');
+            const savedEl = document.getElementById('savedJson');
+            if (loadedEl) loadedEl.value = lastLoadedJson;
+            if (savedEl) savedEl.value = lastSavedJson;
+        }
+
         // Save exercises to localStorage
         function saveExercises(exercises) {
+            lastSavedJson = JSON.stringify(exercises, null, 2);
+            updateDebugJson();
             localStorage.setItem(STORAGE_KEY, JSON.stringify(exercises));
         }
 
