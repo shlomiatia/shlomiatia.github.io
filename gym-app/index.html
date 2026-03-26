@@ -172,7 +172,7 @@
             margin-bottom: 6px;
         }
 
-        .debug-json {
+        .debug-log {
             margin-top: 12px;
             padding: 8px;
             border: 1px solid #ddd;
@@ -180,30 +180,23 @@
             background: #f7f7f7;
         }
 
-        .debug-json h2 {
+        .debug-log h2 {
             font-size: 0.95em;
             margin-bottom: 6px;
             color: #333;
         }
 
-        .debug-json textarea {
+        .debug-log textarea {
             width: 100%;
             min-height: 120px;
             font-family: monospace;
             font-size: 0.75em;
             padding: 6px;
             margin-top: 4px;
-            margin-bottom: 10px;
             border: 1px solid #ccc;
             border-radius: 4px;
             resize: vertical;
             background: #fff;
-        }
-
-        .debug-json-label {
-            font-size: 0.8em;
-            color: #555;
-            margin-top: 8px;
         }
     </style>
 </head>
@@ -213,12 +206,9 @@
 
         <div id="exercisesList" class="exercises-list"></div>
 
-        <div id="debugJson" class="debug-json">
-            <h2>Copyable JSON (debug)</h2>
-            <div class="debug-json-label">Loaded from localStorage:</div>
-            <textarea id="loadedJson" readonly></textarea>
-            <div class="debug-json-label">Just before last save:</div>
-            <textarea id="savedJson" readonly></textarea>
+        <div id="debugLog" class="debug-log">
+            <h2>Debug Log</h2>
+            <textarea id="logTextarea" readonly></textarea>
         </div>
     </div>
 
@@ -254,15 +244,13 @@
         function loadExercises() {
             const stored = localStorage.getItem(STORAGE_KEY);
             if (!stored) {
-                lastLoadedJson = 'null';
-                updateDebugJson();
+                log('No data in localStorage, initializing defaults');
                 const exercises = initializeDefaultExercises();
                 saveExercises(exercises);
                 setLastUpdateDate(getTodayString());
                 return exercises;
             }
-            lastLoadedJson = JSON.stringify(JSON.parse(stored), null, 2);
-            updateDebugJson();
+            log('Loaded data from localStorage');
             const exercises = JSON.parse(stored);
             return exercises;
         }
@@ -302,18 +290,20 @@
         let lastLoadedJson = '';
         let lastSavedJson = '';
 
-        function updateDebugJson() {
-            const loadedEl = document.getElementById('loadedJson');
-            const savedEl = document.getElementById('savedJson');
-            if (loadedEl) loadedEl.value = lastLoadedJson;
-            if (savedEl) savedEl.value = lastSavedJson;
+        // Log function for debugging
+        function log(message) {
+            const logTextarea = document.getElementById('logTextarea');
+            if (logTextarea) {
+                const timestamp = new Date().toLocaleTimeString();
+                logTextarea.value += `[${timestamp}] ${message}\n`;
+                logTextarea.scrollTop = logTextarea.scrollHeight; // Auto-scroll to bottom
+            }
         }
 
         // Save exercises to localStorage
         function saveExercises(exercises) {
-            lastSavedJson = JSON.stringify(exercises, null, 2);
-            updateDebugJson();
             localStorage.setItem(STORAGE_KEY, JSON.stringify(exercises));
+            log('Saved exercises to localStorage');
         }
 
         // Get last update date
@@ -434,12 +424,17 @@
 
         // Update a set value
         function updateSet(exerciseId, setIndex, category, field, value) {
+            log(`updateSet called: exerciseId=${exerciseId}, setIndex=${setIndex}, category=${category}, field=${field}, value=${value}`);
             const exercises = loadExercises();
             const exercise = exercises.find(ex => ex.id === exerciseId);
+            log(`Found exercise: ${exercise ? exercise.name : 'NOT FOUND'}`);
 
             if (exercise) {
                 exercise.sets[setIndex][category][field] = value;
                 saveExercises(exercises);
+                log('Saved successfully');
+            } else {
+                log(`Exercise not found, available IDs: ${exercises.map(ex => ex.id).join(', ')}`);
             }
         }
 
@@ -519,6 +514,7 @@
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', () => {
+            log('App initialized');
             // Check and rollover day if needed
             checkAndRolloverDay();
 
