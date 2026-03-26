@@ -443,6 +443,11 @@
             const exercises = loadExercises();
             const container = document.getElementById('exercisesList');
 
+            log(`Rendering ${exercises.length} exercises`);
+            exercises.forEach(ex => {
+                log(`Exercise: ${ex.name} (ID: ${ex.id})`);
+            });
+
             if (exercises.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
