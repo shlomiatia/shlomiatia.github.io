@@ -459,10 +459,10 @@
 
             container.innerHTML = exercises.map(exercise => `
                 <div class="exercise-card ${exercise.collapsed ? 'collapsed' : ''}">
-                    <div class="exercise-header" onclick="toggleCollapse(${exercise.id})">
+                    <div class="exercise-header" onclick="toggleCollapse('${exercise.id}')">
                         <div class="exercise-name">${escapeHtml(exercise.name)}</div>
                         <span class="collapse-indicator">▼</span>
-                        <button class="delete-btn" onclick="event.stopPropagation(); deleteExercise(${exercise.id})">Delete</button>
+                        <button class="delete-btn" onclick="event.stopPropagation(); deleteExercise('${exercise.id}')">Delete</button>
                     </div>
                     <div class="sets-container">
                         ${exercise.sets.map((set, index) => `
@@ -477,7 +477,7 @@
                                                 class="set-input"
                                                 placeholder="kg"
                                                 value="${set[category].weight}"
-                                                oninput="updateSet(${exercise.id}, ${index}, '${category}', 'weight', this.value)"
+                                                oninput="updateSet('${exercise.id}', ${index}, '${category}', 'weight', this.value)"
                                                 step="0.5"
                                             >
                                             <span class="set-input-label">kg</span>
@@ -486,7 +486,7 @@
                                                 class="set-input"
                                                 placeholder="reps"
                                                 value="${set[category].reps}"
-                                                oninput="updateSet(${exercise.id}, ${index}, '${category}', 'reps', this.value)"
+                                                oninput="updateSet('${exercise.id}', ${index}, '${category}', 'reps', this.value)"
                                             >
                                             <span class="set-input-label">reps</span>
                                         </div>
