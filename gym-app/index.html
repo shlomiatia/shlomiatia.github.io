@@ -259,7 +259,7 @@
         function initializeDefaultExercises() {
             const exercises = DEFAULT_EXERCISES.map((name, index) => {
                 return {
-                    id: Date.now() + index,
+                    id: name,
                     name: name,
                     collapsed: false,
                     sets: [
@@ -328,7 +328,6 @@
             DEFAULT_EXERCISES.forEach(name => {
                 if (!existingNames.has(name)) {
                     const ex = createExercise(name);
-                    ex.id = Date.now() + (idOffset++);
                     exercises.push(ex);
                 }
             });
@@ -385,7 +384,7 @@
         // Create a new exercise object
         function createExercise(name) {
             return {
-                id: Date.now(),
+                id: name,
                 name: name,
                 collapsed: false,
                 sets: [
