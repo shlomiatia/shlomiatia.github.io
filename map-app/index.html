@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shared Map</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     <style>
@@ -23,6 +21,7 @@
             background: #1a73e8;
             color: white;
             flex-shrink: 0;
+            z-index: 10;
         }
 
         header h1 { font-size: 1.2rem; margin-bottom: 8px; }
@@ -47,6 +46,7 @@
             font-weight: 600;
             cursor: pointer;
             font-size: 1rem;
+            white-space: nowrap;
         }
 
         .search-row button:hover { background: #e8f0fe; }
@@ -81,6 +81,16 @@
             cursor: pointer;
             color: #202124;
         }
+
+        .location-sub {
+            font-size: 0.75rem;
+            color: #5f6368;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .location-text { flex: 1; overflow: hidden; cursor: pointer; }
 
         .delete-btn {
             background: none;
@@ -119,9 +129,6 @@
 
 <script>
 // ── Firebase config ───────────────────────────────────────────────────────────
-// 1. Go to https://console.firebase.google.com and create a project
-// 2. Add a web app, copy the config object here
-// 3. Go to Realtime Database → Create database → Start in test mode
 const firebaseConfig = {
     apiKey:            "AIzaSyApSFwx38AJBHf--LEw-N7T65LM895t9IM",
     authDomain:        "map-app-e6447.firebaseapp.com",
@@ -136,38 +143,56 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const locationsRef = firebase.database().ref('locations');
 
-// Map setup
-const map = L.map('map').setView([20, 0], 2);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-}).addTo(map);
-
+let map, autocomplete;
 const markers = {};
 
-// Sync all locations from Firebase in real-time
-locationsRef.on('value', snapshot => {
-    Object.values(markers).forEach(m => map.removeLayer(m));
-    Object.keys(markers).forEach(k => delete markers[k]);
-
-    const list = document.getElementById('location-list');
-    list.innerHTML = '';
-
-    if (!snapshot.exists()) {
-        list.innerHTML = '<p class="empty-state">No locations yet.</p>';
-        return;
-    }
-
-    snapshot.forEach(child => {
-        const loc = child.val();
-        placeMarker(child.key, loc);
-        appendItem(child.key, loc);
+function initMap() {
+    map = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: 20, lng: 0 },
+        zoom: 2,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
     });
-});
+
+    autocomplete = new google.maps.places.Autocomplete(
+        document.getElementById('search'),
+        { fields: ['name', 'formatted_address', 'geometry'] }
+    );
+
+    // Prevent form submit on Enter inside autocomplete
+    autocomplete.addListener('place_changed', () => {});
+
+    // Sync locations from Firebase in real-time
+    locationsRef.on('value', snapshot => {
+        Object.values(markers).forEach(m => m.setMap(null));
+        Object.keys(markers).forEach(k => delete markers[k]);
+
+        const list = document.getElementById('location-list');
+        list.innerHTML = '';
+
+        if (!snapshot.exists()) {
+            list.innerHTML = '<p class="empty-state">No locations yet.</p>';
+            return;
+        }
+
+        snapshot.forEach(child => {
+            placeMarker(child.key, child.val());
+            appendItem(child.key, child.val());
+        });
+    });
+}
 
 function placeMarker(id, loc) {
-    const marker = L.marker([loc.lat, loc.lon])
-        .addTo(map)
-        .bindPopup(`<b>${loc.query}</b><br><small>${loc.name}</small>`);
+    const marker = new google.maps.Marker({
+        map,
+        position: { lat: loc.lat, lng: loc.lon },
+        title: loc.name,
+    });
+    const infoWindow = new google.maps.InfoWindow({
+        content: `<b>${loc.name}</b><br><small>${loc.address}</small>`
+    });
+    marker.addListener('click', () => infoWindow.open(map, marker));
     markers[id] = marker;
 }
 
@@ -176,59 +201,49 @@ function appendItem(id, loc) {
     const item = document.createElement('div');
     item.className = 'location-item';
     item.innerHTML = `
-        <span class="location-name" title="${loc.name}">${loc.query}</span>
+        <div class="location-text">
+            <div class="location-name">${loc.name}</div>
+            <div class="location-sub">${loc.address}</div>
+        </div>
         <button class="delete-btn" title="Remove">✕</button>
     `;
-    item.querySelector('.location-name').onclick = () => {
-        map.setView([loc.lat, loc.lon], 13);
-        markers[id]?.openPopup();
+    item.querySelector('.location-text').onclick = () => {
+        map.setCenter({ lat: loc.lat, lng: loc.lon });
+        map.setZoom(13);
+        google.maps.event.trigger(markers[id], 'click');
     };
     item.querySelector('.delete-btn').onclick = () =>
         locationsRef.child(id).remove();
     list.appendChild(item);
 }
 
-async function addLocation() {
-    const input = document.getElementById('search');
-    const btn = document.getElementById('add-btn');
-    const query = input.value.trim();
-    if (!query) return;
+function addLocation() {
+    const place = autocomplete.getPlace();
 
-    btn.disabled = true;
-    btn.textContent = '…';
-
-    try {
-        const res = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`
-        );
-        const results = await res.json();
-
-        if (!results.length) {
-            alert('Location not found — try a more specific name.');
-            return;
-        }
-
-        const { lat, lon, display_name } = results[0];
-        await locationsRef.push({
-            query,
-            name: display_name,
-            lat: parseFloat(lat),
-            lon: parseFloat(lon),
-            addedAt: Date.now()
-        });
-
-        input.value = '';
-    } catch {
-        alert('Something went wrong — please try again.');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Add';
+    if (!place || !place.geometry) {
+        alert('Please select a location from the dropdown suggestions.');
+        return;
     }
-}
 
-document.getElementById('search').addEventListener('keydown', e => {
-    if (e.key === 'Enter') addLocation();
-});
+    locationsRef.push({
+        name: place.name,
+        address: place.formatted_address,
+        lat: place.geometry.location.lat(),
+        lon: place.geometry.location.lng(),
+        addedAt: Date.now()
+    });
+
+    document.getElementById('search').value = '';
+}
+</script>
+
+<!-- ── Replace YOUR_GOOGLE_MAPS_API_KEY below ─────────────────────────────────
+     Get a key at https://console.cloud.google.com → APIs & Services → Credentials
+     Enable: Maps JavaScript API + Places API
+     Restrict key to: https://shlomiatia.github.io/*
+     ────────────────────────────────────────────────────────────────────────── -->
+<script async
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD-Fs02V2ud_nGahJNFCHF4kuOIBAS1TDs&libraries=places&callback=initMap">
 </script>
 
 </body>
